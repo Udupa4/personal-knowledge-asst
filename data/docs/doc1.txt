@@ -1,0 +1,2 @@
+Title: Model Context Protocol (MCP) overview
+MCP is a protocol that standardizes how tools and context are exposed to LLM-based agents. It allows agent clients to discover tools and call them with a structured message format. Typical transports include JSON over WebSocket. MCP servers publish tool manifests and accept invocations.
