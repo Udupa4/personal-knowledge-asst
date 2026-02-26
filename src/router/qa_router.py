@@ -24,10 +24,9 @@ async def ingest_docs():
     """
     Create or update the local Chroma store from a list of Documents (chunks).
     """
-    global docs
-    docs = loader.load_and_split()
-    count = len(docs)
-    vector_retriever.build_or_load(docs)
+    documents = loader.load_and_split()
+    count = len(documents)
+    vector_retriever.build_or_load(documents)
     return {"status": "ingested", "chunks": count}
 
 @router.post("/qa", dependencies=[Depends(require_api_key)])
