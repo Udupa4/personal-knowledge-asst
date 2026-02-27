@@ -16,10 +16,9 @@ except Exception as e:
     GoogleGenerativeAIEmbeddings = None
 
 DATA_DIR = "./data/docs"
-EMBEDDING_PROVIDER = os.environ.get("EMBEDDING_PROVIDER", "huggingface").lower()
 CHROMA_PERSIST_DIR = os.environ.get("CHROMA_PERSIST_DIR", "./chroma_store")
 DEFAULT_EMBEDDING_MODEL = os.environ.get("GEMINI_EMBEDDING_MODEL", "models/gemini-embedding-001")
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "").strip()
+GOOGLE_API_KEY = None
 
 class ChunkedDocLoader:
     def __init__(self, chunk_size: int = 800, chunk_overlap: int = 200):
@@ -29,6 +28,7 @@ class ChunkedDocLoader:
 
     def load_and_split(self, doc_dir: Optional[str] = None) -> List[Document]:
         base = doc_dir or DATA_DIR
+        logger.info(f"Loading and Splitting documents from {base}")
         docs = []
         if not os.path.exists(base):
             os.makedirs(base, exist_ok=True)
@@ -42,6 +42,7 @@ class ChunkedDocLoader:
             full_doc = Document(page_content=text, metadata={"source": path, "title": title})
             chunks = self.splitter.split_documents([full_doc])
             docs.extend(chunks)
+        logger.info(f"Loaded and split {len(docs)} documents using RecursiveSplitter")
         return docs
 
 class VectorRetriever:
@@ -52,10 +53,11 @@ class VectorRetriever:
 
     @staticmethod
     def _select_embeddings():
-        provider = EMBEDDING_PROVIDER or "huggingface"
-        provider = provider.lower()
+        global GOOGLE_API_KEY
+        GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "").strip()
+        provider = os.environ.get("EMBEDDING_PROVIDER", "huggingface").lower()
         if provider in ("google", "gemini", "google_genai") and GOOGLE_API_KEY:
-            print("Using Google Generative AI for embeddings")
+            logger.info("Using Google Generative AI for embeddings")
             try:
                 return GoogleGenerativeAIEmbeddings(model=DEFAULT_EMBEDDING_MODEL, api_key=SecretStr(GOOGLE_API_KEY))
             except Exception as ex:
@@ -70,9 +72,13 @@ class VectorRetriever:
 
     def build_or_load(self, docs: List[Document]):
         os.makedirs(self.persist_directory, exist_ok=True)
-        logger.info(f"Creating Chromadb from {DATA_DIR}")
-        # temp_persist_dir = self.persist_directory + "_tmp"
-        self.vectordb = Chroma.from_documents(docs, self.embeddings, persist_directory=self.persist_directory)
+        if os.path.exists(os.path.join(self.persist_directory, "chroma.sqlite3")):
+            logger.info("Found existing Chroma store. Using the same as persist_directory")
+            self.vectordb = Chroma(persist_directory=self.persist_directory, embedding_function=self.embeddings)
+        else:
+            logger.info(f"Creating new Chroma store from {DATA_DIR}")
+            self.vectordb = Chroma.from_documents(docs, self.embeddings, persist_directory=self.persist_directory)
+            logger.info(f"Created Chroma store out of {len(docs)} documents")
 
     def retrieve(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
         if not self.vectordb:

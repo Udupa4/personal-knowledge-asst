@@ -17,6 +17,8 @@ mm = MemoryManager()
 # initialize retriever and loader
 loader = ChunkedDocLoader(chunk_size=800, chunk_overlap=200)
 vector_retriever = VectorRetriever()
+docs = loader.load_and_split()
+vector_retriever.build_or_load(docs)
 
 # create an endpoint to (re)ingest docs into Chroma via API
 @router.post("/ingest", dependencies=[Depends(require_api_key)])
@@ -31,14 +33,17 @@ async def ingest_docs():
 
 @router.post("/qa", dependencies=[Depends(require_api_key)])
 async def ask_question(payload: QAIn):
-    stm = await mm.read_stm(payload.session_id, k=6)
+    stm_context = await mm.read_stm(payload.session_id, k=6)
     retrieved = vector_retriever.retrieve(payload.question, top_k=payload.top_k)
-    prompt = compose_prompt(stm_context=stm, retrieved=retrieved, user_question=payload.question)
+    prompt = compose_prompt(stm_context=stm_context, retrieved=retrieved, user_question=payload.question)
     answer, metadata = await synthesize_answer(prompt)
-    results = {"answer": answer, "metadata": metadata}
+    await mm.write_stm(payload.session_id, "user", payload.question)    # Write user's question into STM
+    await mm.write_stm(payload.session_id, "assistant", answer)       # Write assistant's answer into STM
+    results = {
+        "answer": answer,
+        "retrieved": retrieved,
+        "stm_context": stm_context,
+        "prompt": prompt,
+        "metadata": metadata
+    }
     return results
-
-    # TODO: implement answerer
-    # prompt = compose_prompt(stm, retrieved, payload.question)
-    # answer = synthesize_answer(prompt)
-    # return {"answer": answer, "evidence": retrieved, "used_stm": stm}
