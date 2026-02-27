@@ -6,6 +6,7 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from pydantic import SecretStr
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 try:
@@ -59,7 +60,8 @@ class VectorRetriever:
                 return GoogleGenerativeAIEmbeddings(model=DEFAULT_EMBEDDING_MODEL, api_key=SecretStr(GOOGLE_API_KEY))
             except Exception as ex:
                 logger.error(f"Failed to initialize GoogleGenerativeAIEmbeddings: {ex}")
-                raise
+                from langchain_huggingface import HuggingFaceEmbeddings
+                return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2", model_kwargs={'local_files_only': True})
         else:
             # Local HuggingFace embeddings (no external key)
             logger.info("Using HuggingFace for embeddings")
@@ -68,16 +70,9 @@ class VectorRetriever:
 
     def build_or_load(self, docs: List[Document]):
         os.makedirs(self.persist_directory, exist_ok=True)
-        # If a persisted index exists, load and upsert new docs
-        index_file = os.path.join(self.persist_directory, "index.sqlite")
-        if os.path.exists(index_file):
-            self.vectordb = Chroma(persist_directory=self.persist_directory, embedding_function=self.embeddings)
-            # Upsert new docs if any (we'll upsert to allow updates)
-            if docs:
-                self.vectordb.add_documents(docs)
-        else:
-            # create new store
-            self.vectordb = Chroma.from_documents(docs, self.embeddings, persist_directory=self.persist_directory)
+        logger.info(f"Creating Chromadb from {DATA_DIR}")
+        # temp_persist_dir = self.persist_directory + "_tmp"
+        self.vectordb = Chroma.from_documents(docs, self.embeddings, persist_directory=self.persist_directory)
 
     def retrieve(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
         if not self.vectordb:

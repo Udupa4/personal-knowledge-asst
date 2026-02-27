@@ -1,9 +1,13 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 import uuid
 
 from src.auth.auth import require_api_key
 from src.dto.session_dto import CreateSessionResp, TurnIn
 from src.memory.manager import MemoryManager
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="", tags=["session"])
 mm = MemoryManager()
