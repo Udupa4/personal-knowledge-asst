@@ -15,7 +15,7 @@ src/
 ├── dto/
 │   ├── qa_dto.py               # QAIn, QAResp Pydantic models
 │   └── session_dto.py          # CreateSessionResp, TurnIn Pydantic models
-├── memory/manager.py           # Redis-backed short-term memory (MemoryManager)
+├── memory/stm_manager.py           # Redis-backed short-term memory (StmMemoryManager)
 ├── qa/retriever.py             # Document loader + Chroma vector retriever
 └── router/
     ├── session_router.py       # Session lifecycle endpoints
@@ -78,21 +78,21 @@ All endpoints require the header: `X-Api-Key: <your_api_key>`
 
 ### Session
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/session` | Create a new session, returns `session_id` |
-| `GET` | `/session` | List all active session IDs |
-| `POST` | `/session/{session_id}/turn` | Append a turn (`role`: `user`/`assistant`/`tool`, `text`) |
-| `GET` | `/session/{session_id}/context?k=6` | Retrieve last `k` turns |
-| `DELETE` | `/session/{session_id}/end` | Delete a specific session |
-| `DELETE` | `/session` | Delete all sessions |
+| Method   | Path                                | Description                                               |
+|----------|-------------------------------------|-----------------------------------------------------------|
+| `POST`   | `/session`                          | Create a new session, returns `session_id`                |
+| `GET`    | `/session`                          | List all active session IDs                               |
+| `POST`   | `/session/{session_id}/turn`        | Append a turn (`role`: `user`/`assistant`/`tool`, `text`) |
+| `GET`    | `/session/{session_id}/context?k=6` | Retrieve last `k` turns                                   |
+| `DELETE` | `/session/{session_id}/end`         | Delete a specific session                                 |
+| `DELETE` | `/session`                          | Delete all sessions                                       |
 
 ### QA & Ingestion
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/ingest` | Re-ingest docs from `data/docs/` into Chroma |
-| `POST` | `/qa` | Query against the knowledge base with session context |
+| Method | Path      | Description                                           |
+|--------|-----------|-------------------------------------------------------|
+| `POST` | `/ingest` | Re-ingest docs from `data/docs/` into Chroma          |
+| `POST` | `/qa`     | Query against the knowledge base with session context |
 
 #### `POST /qa` request body:
 ```json
@@ -110,7 +110,7 @@ All endpoints require the header: `X-Api-Key: <your_api_key>`
 - Documents are **auto-ingested on startup** from `data/docs/`. Only `.txt` files are supported for now.
 - The `POST /ingest` endpoint can be used to re-ingest after adding new documents without restarting.
 - The HuggingFace embedding model runs with `local_files_only=True` — ensure the model is cached before running in network-restricted environments.
-- `MemoryManager` is a **singleton** for now — the same Redis connection is shared across all routers.
+- `StmMemoryManager` is a **singleton** — the same Redis connection is shared across all routers.
 - On server shutdown, all Redis session keys are flushed via `flushdb`.
 - The LLM answerer (`synthesize_answer`) is not yet implemented — `/qa` currently returns raw retrieved chunks and STM context.
 

@@ -4,7 +4,7 @@ from typing import List
 
 from src.auth.auth import require_api_key
 from src.dto.qa_dto import QAIn, QAResp
-from src.memory.manager import MemoryManager
+from src.memory.stm_manager import StmMemoryManager
 from src.qa.answerer import compose_prompt, synthesize_answer
 from src.qa.retriever import ChunkedDocLoader, VectorRetriever
 # from src.qa.answerer import compose_prompt, synthesize_answer
@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="", tags=["qa"])
-mm = MemoryManager()
+stm_mm = StmMemoryManager()
 # initialize retriever and loader
 loader = ChunkedDocLoader(chunk_size=800, chunk_overlap=200)
 vector_retriever = VectorRetriever()
@@ -33,12 +33,14 @@ async def ingest_docs():
 
 @router.post("/qa", dependencies=[Depends(require_api_key)])
 async def ask_question(payload: QAIn):
-    stm_context = await mm.read_stm(payload.session_id, k=6)
+    stm_context = await stm_mm.read_stm(payload.session_id, k=6)
     retrieved = vector_retriever.retrieve(payload.question, top_k=payload.top_k)
     prompt = compose_prompt(stm_context=stm_context, retrieved=retrieved, user_question=payload.question)
-    answer, metadata = await synthesize_answer(prompt)
-    await mm.write_stm(payload.session_id, "user", payload.question)    # Write user's question into STM
-    await mm.write_stm(payload.session_id, "assistant", answer)       # Write assistant's answer into STM
+    # answer, metadata = await synthesize_answer(prompt)
+    answer, metadata = "some_answer", {}
+
+    await stm_mm.write_stm(payload.session_id, user_text=payload.question, assistant_text=answer, meta=metadata)
+
     results = {
         "answer": answer,
         "retrieved": retrieved,

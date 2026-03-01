@@ -1,12 +1,12 @@
 import logging
 from typing import Coroutine, Callable
 
-from src.memory.manager import MemoryManager
+from src.memory.stm_manager import StmMemoryManager
 
 logger = logging.getLogger(__name__)
 EventHandlerType = Callable[[], Coroutine[None, None, None]]
 
-mm = MemoryManager()
+mm = StmMemoryManager()
 
 async def shutdown() -> None:
     logger.info('Executing shutdown')

@@ -4,13 +4,13 @@ import uuid
 
 from src.auth.auth import require_api_key
 from src.dto.session_dto import CreateSessionResp, TurnIn
-from src.memory.manager import MemoryManager
+from src.memory.stm_manager import StmMemoryManager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="", tags=["session"])
-mm = MemoryManager()
+mm = StmMemoryManager()
 sessions = set()
 
 @router.post("/session", response_model=CreateSessionResp, dependencies=[Depends(require_api_key)])
@@ -21,9 +21,7 @@ async def create_session():
 
 @router.post("/session/{session_id}/turn", dependencies=[Depends(require_api_key)])
 async def add_turn(session_id: str, turn: TurnIn):
-    if turn.role not in {"user", "assistant", "tool"}:
-        raise HTTPException(status_code=400, detail="role must be one of 'user','assistant','tool'")
-    item = await mm.write_stm(session_id, turn.role, turn.text)
+    item = await mm.write_turn(session_id, turn.user, turn.assistant)
     return item
 
 @router.get("/session/{session_id}/context", dependencies=[Depends(require_api_key)])

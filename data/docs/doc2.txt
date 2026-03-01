@@ -1,2 +1,2 @@
-Title: Agent architecture and planner/executor
+Agent architecture and planner/executor
 An agent often includes a planner that breaks down a user request into steps and an executor that performs those steps (e.g., calling tools, fetching files). Separation of planner and executor helps with observability and testing.

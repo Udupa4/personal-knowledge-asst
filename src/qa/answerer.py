@@ -31,15 +31,18 @@ def _parse_ai_resp(ai_response: Any) -> Tuple[str, Dict]:
 def compose_prompt(stm_context: List[Dict[str, Any]], retrieved: List[Dict[str, Any]], user_question: str) -> str:
     parts = []
 
+    # Short-term Memory Context
     if stm_context:
         parts.append("\nRecent conversations (most recent first):")
         for turn in stm_context:
-            parts.append(f"- ({turn.get('role')}) {turn.get('text')}")
+            parts.append(f"- User: {turn.get('user')}")
+            parts.append(f"- Assistant: {turn.get('assistant')}")
 
+    # RAG evidence
     if retrieved:
         parts.append("\nEvidence (top results):")
         for i, r in enumerate(retrieved, start=1):
-            parts.append(f"[EVIDENCE {i}] Title: {r.get('title')}\nSnippet: {r.get('snippet')}\n")
+            parts.append(f"[Doc-{i}: {r.get("path")}]\nTitle: {r.get('title')}\nSnippet: {r.get('snippet')}")
     else:
         parts.append("\nNo Evidence Found.")
 

@@ -63,12 +63,12 @@ class VectorRetriever:
             except Exception as ex:
                 logger.error(f"Failed to initialize GoogleGenerativeAIEmbeddings: {ex}")
                 from langchain_huggingface import HuggingFaceEmbeddings
-                return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2", model_kwargs={'local_files_only': True})
+                return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
         else:
             # Local HuggingFace embeddings (no external key)
             logger.info("Using HuggingFace for embeddings")
             from langchain_huggingface import HuggingFaceEmbeddings
-            return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2", model_kwargs={'local_files_only': True})
+            return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
     def build_or_load(self, docs: List[Document]):
         os.makedirs(self.persist_directory, exist_ok=True)
