@@ -28,7 +28,8 @@ def _parse_ai_resp(ai_response: Any) -> Tuple[str, Dict]:
     else:
         return str(ai_response), {}
 
-def compose_prompt(stm_context: List[Dict[str, Any]], retrieved: List[Dict[str, Any]], user_question: str) -> str:
+def compose_prompt(stm_context: List[Dict[str, Any]], ltm_context: List[Dict[str, Any]],
+                   retrieved: List[Dict[str, Any]], user_question: str) -> str:
     parts = []
 
     # Short-term Memory Context
@@ -37,6 +38,12 @@ def compose_prompt(stm_context: List[Dict[str, Any]], retrieved: List[Dict[str, 
         for turn in stm_context:
             parts.append(f"- User: {turn.get('user')}")
             parts.append(f"- Assistant: {turn.get('assistant')}")
+
+    # Long-term Memory Context
+    if ltm_context:
+        parts.append("\nLong-term memory about the user (past sessions):")
+        for mem in ltm_context:
+            parts.append(f"- {mem}")
 
     # RAG evidence
     if retrieved:

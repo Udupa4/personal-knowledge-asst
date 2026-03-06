@@ -4,7 +4,8 @@ from typing import List, Dict, Any, Optional
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
-from pydantic import SecretStr
+
+from src.common.utils.embeddings import select_embeddings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -49,26 +50,7 @@ class VectorRetriever:
     def __init__(self, persist_directory: str = CHROMA_PERSIST_DIR):
         self.persist_directory = persist_directory
         self.vectordb: Optional[Chroma] = None
-        self.embeddings = self._select_embeddings()
-
-    @staticmethod
-    def _select_embeddings():
-        global GOOGLE_API_KEY
-        GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "").strip()
-        provider = os.environ.get("EMBEDDING_PROVIDER", "huggingface").lower()
-        if provider in ("google", "gemini", "google_genai") and GOOGLE_API_KEY:
-            logger.info("Using Google Generative AI for embeddings")
-            try:
-                return GoogleGenerativeAIEmbeddings(model=DEFAULT_EMBEDDING_MODEL, api_key=SecretStr(GOOGLE_API_KEY))
-            except Exception as ex:
-                logger.error(f"Failed to initialize GoogleGenerativeAIEmbeddings: {ex}")
-                from langchain_huggingface import HuggingFaceEmbeddings
-                return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-        else:
-            # Local HuggingFace embeddings (no external key)
-            logger.info("Using HuggingFace for embeddings")
-            from langchain_huggingface import HuggingFaceEmbeddings
-            return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        self.embeddings = select_embeddings()
 
     def build_or_load(self, docs: List[Document]):
         os.makedirs(self.persist_directory, exist_ok=True)
