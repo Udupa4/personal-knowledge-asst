@@ -1,4 +1,6 @@
 .env
 venv/
 /chroma_store
-.idea
+/ltm_store
+__pycache__/
+.idea/

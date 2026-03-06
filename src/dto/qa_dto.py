@@ -3,6 +3,7 @@ from typing import List, Dict, Any
 
 class QAIn(BaseModel):
     session_id: str
+    user_id: str
     question: str
     top_k: int = 3
 
