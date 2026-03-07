@@ -25,14 +25,17 @@ vector_retriever.build_or_load(docs)
 
 # create an endpoint to (re)ingest docs into Chroma via API
 @router.post("/ingest", dependencies=[Depends(require_api_key)])
-async def ingest_docs():
+async def ingest_docs(force: bool = False):
     """
-    Create or update the local Chroma store from a list of Documents (chunks).
+    Ingest documents into Chroma.
+    - force=False (default): only ingest new/modified files (uses manifest)
+    - force=True: re-ingest all files from scratch (ignores manifest)
     """
-    documents = loader.load_and_split()
-    count = len(documents)
-    vector_retriever.build_or_load(documents)
-    return {"status": "ingested", "chunks": count}
+    documents = loader.load_and_split(only_new=not force)
+    if not documents:
+        return {"status": "no_new_docs", "chunks": 0}
+    vector_retriever.build_or_load(documents, add_new=not force)
+    return {"status": "ingested", "new_chunks": len(documents)}
 
 @router.post("/qa", dependencies=[Depends(require_api_key)])
 async def ask_question(payload: QAIn):
