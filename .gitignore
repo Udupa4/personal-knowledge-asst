@@ -1,6 +1,8 @@
 .env
 venv/
-/chroma_store
-/ltm_store
 __pycache__/
 .idea/
+data/.ingest_manifest.json
+data/.docstore.pkl
+chroma_store/
+ltm_store/

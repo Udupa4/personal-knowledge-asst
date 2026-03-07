@@ -49,7 +49,7 @@ def compose_prompt(stm_context: List[Dict[str, Any]], ltm_context: List[Dict[str
     if retrieved:
         parts.append("\nEvidence (top results):")
         for i, r in enumerate(retrieved, start=1):
-            parts.append(f"[Doc-{i}: {r.get("path")}]\nTitle: {r.get('title')}\nSnippet: {r.get('snippet')}")
+            parts.append(f"[Doc-{i}: {r.get("filename")}]\nTitle: {r.get('title')}\nSnippet: {r.get('snippet')}")
     else:
         parts.append("\nNo Evidence Found.")
 

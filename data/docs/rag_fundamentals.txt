@@ -1,0 +1,52 @@
+Retrieval-Augmented Generation (RAG) — Fundamentals
+
+RAG is a technique that enhances LLM responses by retrieving relevant documents
+at query time and providing them as context, rather than relying solely on
+the model's parametric memory.
+
+Architecture:
+
+1. Ingestion pipeline
+   - Load raw documents (PDFs, text files, web pages)
+   - Split into chunks using strategies like RecursiveCharacterTextSplitter
+     (chunk_size=800, chunk_overlap=200 is a common starting point)
+   - Embed each chunk using an embedding model (e.g., Gemini embedding-001,
+     OpenAI text-embedding-3-small, or local all-MiniLM-L6-v2)
+   - Store embeddings + metadata in a vector database (ChromaDB, Pinecone, Weaviate)
+
+2. Retrieval
+   - At query time, embed the user's question using the same embedding model
+   - Perform similarity search (cosine or L2 distance) in the vector DB
+   - Retrieve top-k most relevant chunks
+
+3. Augmented generation
+   - Inject retrieved chunks into the LLM prompt as evidence
+   - Instruct the LLM to cite evidence: "Answer only from the provided evidence"
+
+Chunking strategies:
+- Fixed size: simple, predictable, but may split mid-sentence
+- Recursive: splits on paragraph → sentence → word boundaries (preferred)
+- Semantic: splits on meaning shifts (requires embedding each sentence, expensive)
+- Document-aware: respects headings and structure (best for structured docs)
+
+Chunk size trade-offs:
+- Small chunks (200-400 tokens): precise retrieval, but may lack context
+- Large chunks (800-1200 tokens): more context per chunk, but noisier retrieval
+- Overlap (10-20% of chunk size): prevents losing context at chunk boundaries
+
+Embedding model selection:
+- Gemini embedding-001: strong multilingual, 768 dimensions, requires API key
+- all-MiniLM-L6-v2: fast local model, 384 dimensions, good for prototyping
+- text-embedding-3-large: OpenAI's best, 3072 dimensions, high accuracy
+
+Evaluation metrics (RAGAs framework):
+- Faithfulness: is the answer grounded in the retrieved context?
+- Answer relevancy: does the answer actually address the question?
+- Context recall: were all necessary documents retrieved?
+- Context precision: were the retrieved docs actually useful?
+
+Common failure modes:
+- Retrieval failure: the right chunk is not retrieved (wrong embedding model,
+  chunk too large, query phrasing mismatch)
+- Context overflow: too many chunks → LLM loses focus
+- Hallucination despite RAG: LLM ignores evidence and uses parametric memory

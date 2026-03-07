@@ -1,0 +1,50 @@
+Python Async Patterns and Best Practices
+
+Python's asyncio allows concurrent I/O-bound operations using async/await syntax.
+The event loop runs coroutines — functions defined with `async def` — and switches
+between them at every `await` point.
+
+Key patterns:
+
+1. async/await basics
+   Use `await` only inside `async def` functions. Calling `asyncio.run()` starts the
+   event loop from synchronous code.
+
+   async def fetch_data(url: str) -> str:
+       async with aiohttp.ClientSession() as session:
+           async with session.get(url) as response:
+               return await response.text()
+
+2. Gathering concurrent tasks
+   Use `asyncio.gather()` to run multiple coroutines concurrently:
+
+   results = await asyncio.gather(fetch_data(url1), fetch_data(url2))
+
+   If one task fails, gather cancels the rest by default. Use
+   `return_exceptions=True` to collect errors instead of raising.
+
+3. Background tasks in FastAPI
+   FastAPI's `BackgroundTasks` runs work after returning a response:
+
+   @app.post("/process")
+   async def process(bg: BackgroundTasks):
+       bg.add_task(heavy_function, arg1, arg2)
+       return {"status": "accepted"}
+
+4. Avoiding blocking calls
+   Never call blocking I/O (file reads, `requests`, `time.sleep`) inside async
+   functions. Use `asyncio.to_thread()` to offload blocking calls:
+
+   result = await asyncio.to_thread(blocking_function, arg)
+
+5. Redis async with aioredis
+   aioredis provides async-native Redis operations:
+
+   redis = aioredis.from_url("redis://localhost:6379", decode_responses=True)
+   await redis.set("key", "value", ex=3600)
+   val = await redis.get("key")
+
+Common pitfalls:
+- Mixing sync and async: calling a sync function that internally does I/O blocks the event loop.
+- Forgetting to await: a coroutine not awaited does nothing and returns a coroutine object.
+- Using asyncio.sleep(0) to yield control back to the event loop within a tight loop.

@@ -1,0 +1,46 @@
+Vector Databases — Comparison and Use Cases
+
+Vector databases store high-dimensional embeddings and support efficient
+approximate nearest-neighbor (ANN) search.
+
+ChromaDB:
+- Open-source, runs in-process or as a server
+- Persistent mode: stores to local SQLite + parquet files
+- Best for: prototyping, local development, small to medium datasets (<1M vectors)
+- Filter support: metadata filtering using $eq, $in, $and, $or operators
+- Python: pip install chromadb langchain-chroma
+- Limitations: no built-in sharding, single-node only
+
+Pinecone:
+- Fully managed cloud vector DB
+- Supports namespaces for multi-tenancy (per-user isolation)
+- Best for: production workloads, large datasets (100M+ vectors)
+- Upsert-based: you push vectors + metadata, it handles indexing
+- Serverless tier: pay-per-query, no idle costs
+- Limitations: proprietary, vendor lock-in, cost at scale
+
+Weaviate:
+- Open-source, self-hostable or cloud
+- Built-in hybrid search: combines vector + BM25 keyword search
+- GraphQL query interface
+- Best for: hybrid search workloads, when keyword + semantic search both matter
+- Modules: text2vec-openai, text2vec-cohere, etc. for auto-embedding
+
+FAISS (Facebook AI Similarity Search):
+- Library, not a database (no persistence, no metadata filtering)
+- Blazing fast for pure ANN search on large in-memory datasets
+- Best for: research, batch processing, when you don't need metadata filters
+- Requires manual serialization to persist to disk
+
+Qdrant:
+- Open-source, Rust-based, extremely fast
+- Strong filtering: filter + vector search in a single query (no post-filtering)
+- Payload (metadata) stored alongside vectors
+- Best for: production use cases where filter + vector search must be combined efficiently
+
+Choosing the right DB:
+- Prototyping locally → ChromaDB
+- Production, managed → Pinecone
+- Hybrid search needed → Weaviate or Qdrant
+- Max speed, in-memory → FAISS
+- Self-hosted production → Qdrant

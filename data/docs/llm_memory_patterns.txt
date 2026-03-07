@@ -1,0 +1,56 @@
+LLM Memory Patterns — STM, LTM, and Episodic Memory
+
+LLMs are stateless by default — each API call is independent. Memory systems
+add state to make LLM applications context-aware across turns and sessions.
+
+Short-Term Memory (STM):
+- Scope: within a single session/conversation
+- Storage: in-memory list, Redis, or directly in the LLM context window
+- Capacity: limited by context window (e.g., last k turns)
+- Implementation: store (role, text) or (user, assistant) turn pairs
+  in Redis with a session_id key; expire after TTL (e.g., 24 hours)
+- Trade-off: fast reads, but lost when session ends
+
+Long-Term Memory (LTM):
+- Scope: persists across sessions, keyed by user_id
+- Storage: vector database (semantic LTM) or relational DB (structured LTM)
+- Capacity: effectively unlimited
+- Implementation:
+  1. On session end, summarize STM turns with an LLM
+  2. Embed the summary and store in ChromaDB with user_id metadata
+  3. On new session start, retrieve top-k relevant memories by semantic
+     similarity to the current query
+- Trade-off: requires summarization step; retrieval quality depends on
+  embedding model and summary quality
+
+Episodic Memory:
+- Stores raw conversation episodes (timestamped), not summaries
+- Enables "remember when we talked about X?" queries
+- Higher storage cost, but more faithful to original content
+- Can be layered on top of LTM: store raw episodes in a separate collection
+
+Working Memory (in agents):
+- The active context being processed by the agent at any moment
+- In LangGraph: represented as the AgentState object passed between nodes
+- Includes: current query, retrieved docs, LTM context, STM context, tool outputs
+
+Memory injection into prompts:
+  System prompt:
+    "Long-term memory about this user:
+    - User prefers concise answers
+    - User is learning about RAG and vector databases
+    - User previously discussed async Python patterns"
+
+  Recent turns (STM):
+    "User: What is chunking in RAG?
+     Assistant: Chunking splits documents into smaller pieces..."
+
+  Evidence (RAG):
+    "[EVIDENCE 1] Title: RAG Fundamentals
+     Snippet: Chunking strategies include fixed-size, recursive..."
+
+Memory hierarchy best practices:
+- Always inject LTM before STM in the prompt (long-range context first)
+- Limit STM to 5-8 turns to avoid context overflow
+- Summarize aggressively for LTM — bullet points outperform raw transcripts
+- Tag LTM with timestamps to allow recency-weighted retrieval
