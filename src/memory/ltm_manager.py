@@ -2,8 +2,6 @@ import os
 import logging
 from typing import List
 from langchain_chroma import Chroma
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from pydantic import SecretStr
 
 from src.common.utils.embeddings import select_embeddings
 from src.common.utils.singletone import SingletonMeta

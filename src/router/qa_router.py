@@ -3,12 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 
 from src.auth.auth import require_api_key
-from src.dto.qa_dto import QAIn, QAResp
+from src.dto.qa_dto import QAIn, QAResp, EvidenceItem
 from src.memory.ltm_manager import LtmManager
 from src.memory.stm_manager import StmMemoryManager
 from src.qa.answerer import compose_prompt, synthesize_answer
 from src.qa.retriever import ChunkedDocLoader, VectorRetriever
-# from src.qa.answerer import compose_prompt, synthesize_answer
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -53,12 +52,10 @@ async def ask_question(payload: QAIn):
 
     await stm_mm.write_stm(payload.session_id, user_text=payload.question, assistant_text=answer, meta=metadata)
 
-    results = {
-        "answer": answer,
-        "matching_docs": matching_docs,
-        "stm_context": stm_context,
-        "ltm_context": ltm_context,
-        "prompt": prompt,
-        "metadata": metadata
-    }
-    return results
+    return QAResp(
+        answer=answer,
+        evidence=[EvidenceItem(**doc) for doc in matching_docs],
+        stm_context=stm_context,
+        ltm_context=ltm_context,
+        metadata=metadata
+    )
