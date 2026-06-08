@@ -19,7 +19,7 @@ def _parse_ai_resp(ai_response: Any) -> Tuple[str, Dict]:
         usage_metadata = getattr(ai_response, "usage_metadata", {}) or {}
 
         # Extract required metadata
-        metadata["model_name"] = resp_metadata.get("model_name", "")
+        metadata["model_name"] = resp_metadata.get("model_name") or resp_metadata.get("model", "")
         metadata["finish_reason"] = resp_metadata.get("finish_reason", "")
         metadata["prompt_feedback"] = resp_metadata.get("prompt_feedback", "")
         metadata["usage"] = usage_metadata

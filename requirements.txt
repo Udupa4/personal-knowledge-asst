@@ -7,6 +7,7 @@ langchain-huggingface
 langchain_chroma
 langchain-core
 langchain-google-genai>=0.1.0
+langchain-openai
 sentence-transformers
 openai
 redis

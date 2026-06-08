@@ -1,5 +1,10 @@
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+
+class EvidenceItem(BaseModel):
+    title: str
+    filename: str
+    snippet: str
 
 class QAIn(BaseModel):
     session_id: str
@@ -9,5 +14,7 @@ class QAIn(BaseModel):
 
 class QAResp(BaseModel):
     answer: str
-    evidence: List[Dict[str, Any]]
-    used_stm: List[Dict[str, Any]]
+    evidence: List[EvidenceItem]
+    stm_context: List[Dict[str, Any]]
+    ltm_context: List[str]
+    metadata: Optional[Dict[str, Any]] = None

@@ -15,11 +15,43 @@ logger = logging.getLogger(__name__)
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0").strip()
 STM_TTL = int(os.environ.get("STM_TTL_SECONDS", 86400))     # 24 hours
+SESSION_SET_KEY = "sessions:active"
 
 class StmMemoryManager(metaclass=SingletonMeta):
     def __init__(self):
         self.redis = aioredis.from_url(REDIS_URL, decode_responses=True)
 
+    # Session Management via Redis
+    async def create_session(self, session_id: str, user_id: str) -> bool:
+        meta = {"user_id": user_id, "created_at": datetime.now(UTC).isoformat()}
+        pipe = self.redis.pipeline()
+        pipe.sadd(SESSION_SET_KEY, session_id)
+        pipe.set(f"session:{session_id}:meta", json.dumps(meta), ex=STM_TTL)
+        await pipe.execute()
+        return True
+
+    async def list_sessions(self) -> list:
+        return list(await self.redis.smembers(SESSION_SET_KEY))
+
+    async def clear_session(self, session_id: str):
+        pipe = self.redis.pipeline()
+        pipe.delete(f"session:{session_id}:stm")
+        pipe.delete(f"session:{session_id}:meta")
+        pipe.srem(SESSION_SET_KEY, session_id)
+        await pipe.execute()
+
+    async def clear_all_sessions(self):
+        session_ids = await self.redis.smembers(SESSION_SET_KEY)
+        if not session_ids:
+            return
+        pipe = self.redis.pipeline()
+        for sid in session_ids:
+            pipe.delete(f"session:{sid}:stm")
+            pipe.delete(f"session:{sid}:meta")
+        pipe.delete(SESSION_SET_KEY)
+        await pipe.execute()
+
+    # STM implementation via Redis
     async def write_stm(self, session_id: str, user_text: str, assistant_text: str,
                         meta: Dict[str, Any] = None) -> Dict[str, Any]:
         """
@@ -34,8 +66,10 @@ class StmMemoryManager(metaclass=SingletonMeta):
         }
 
         key = f"session:{session_id}:stm"
-        await self.redis.lpush(key, json.dumps(turn))
-        await self.redis.expire(key, STM_TTL)
+        pipe = self.redis.pipeline()
+        pipe.lpush(key, json.dumps(turn))
+        pipe.expire(key, STM_TTL)
+        await pipe.execute()
         return turn
 
     async def read_stm(self, session_id: str, k: int = 6) -> List[Dict[str, Any]]:
@@ -57,11 +91,3 @@ class StmMemoryManager(metaclass=SingletonMeta):
             ltm.save(summary, user_id, session_id)
         await self.clear_session(session_id)
         return summary
-
-    async def clear_session(self, session_id: str):
-        key = f"session:{session_id}:stm"
-        await self.redis.delete(key)
-        return True
-
-    async def clear_all_sessions(self):
-        await self.redis.flushdb()
