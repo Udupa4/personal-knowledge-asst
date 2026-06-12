@@ -28,7 +28,7 @@ def _parse_ai_resp(ai_response: Any) -> Tuple[str, Dict]:
     else:
         return str(ai_response), {}
 
-def compose_prompt(stm_context: List[Dict[str, Any]], ltm_context: List[Dict[str, Any]],
+def compose_prompt(stm_context: List[Dict[str, Any]], ltm_context: List[str],
                    retrieved: List[Dict[str, Any]], user_question: str) -> str:
     parts = []
 
