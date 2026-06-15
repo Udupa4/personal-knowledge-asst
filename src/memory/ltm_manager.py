@@ -3,8 +3,8 @@ import logging
 from typing import List
 from langchain_chroma import Chroma
 
-from src.common.utils.embeddings import select_embeddings
-from src.common.utils.singletone import SingletonMeta
+from src.utils.embeddings import select_embeddings
+from src.utils.singletone import SingletonMeta
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

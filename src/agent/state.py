@@ -1,4 +1,5 @@
-from typing import TypedDict, List, Optional, Dict, Any
+from typing import TypedDict, List, Optional, Dict, Any, Annotated
+from langgraph.graph.message import add_messages
 
 
 class AgentState(TypedDict):
@@ -34,3 +35,8 @@ class AgentState(TypedDict):
     # Any node can write here on failure. Downstream nodes check this
     # and degrade gracefully instead of crashing the graph.
     error: Optional[str]
+
+    # ── Message accumulator ─────────────────────────────────────────────────────
+    # add_messages reducer appends rather than overwrites.
+    # Holds the full conversation between the LLM and tool calls.
+    messages: Annotated[list, add_messages]

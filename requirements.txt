@@ -1,6 +1,7 @@
 fastapi
 uvicorn[standard]
 langchain
+langchain-community
 langchain-classic
 langchain-text-splitters
 langchain-huggingface
@@ -19,3 +20,4 @@ python-dotenv
 pydantic
 httpx
 websockets
+tavily-python

@@ -1,28 +1,40 @@
 import logging
+from langchain_core.messages import AIMessage
+
 from src.agent.state import AgentState
 from src.memory.stm_manager import StmMemoryManager
+from src.utils.agent_utils import get_message_text
 
 logger = logging.getLogger(__name__)
 
 _stm_mm = StmMemoryManager()
 
+def _extract_answer(state: AgentState) -> str:
+    answer = state.get("answer")
+    if answer and isinstance(answer, str):
+        return answer
+
+    messages = state.get("messages", [])
+    for msg in reversed(messages):
+        if not isinstance(msg, AIMessage):
+            continue
+        if getattr(msg, "tool_calls", None):
+            continue
+        text = get_message_text(msg)
+        if text:
+            return text
+
+    return state.get("error") or "(no response)"
+
 
 async def write_memory_node(state: AgentState) -> dict:
     """
-    Persist the completed turn to STM (Redis). Always the final node.
-
-    Uses state["answer"] as the assistant turn — which is populated by
-    synthesize_node for rag/memory_only/rag_and_memory routes, and by
-    clarify_node for the clarify route.
-
-    If answer is empty (upstream failure), falls back to the error string
-    so the turn is still recorded and the context window stays coherent.
+    Persist the completed turn to STM. Always the final node.
+    Handles both clarify_node output (state["answer"]) and
+    agent_node output (state["messages"][-1].content).
     """
-    answer = state.get("answer") or state.get("error") or "(no response)"
+    answer = _extract_answer(state)
     meta = state.get("metadata", {})
-
-    # Attach routing info to the turn metadata — useful when debugging
-    # why the agent answered the way it did for a given turn.
     meta["route"] = state.get("route", "unknown")
     meta["route_reasoning"] = state.get("route_reasoning", "")
 
@@ -38,4 +50,4 @@ async def write_memory_node(state: AgentState) -> dict:
         logger.error(f"write_memory_node failed: {e}")
         return {"error": str(e)}
 
-    return {}   # {} denotes that the node executed its task(writing stm) and no state to update
+    return {"answer": answer}
