@@ -1,0 +1,39 @@
+Nexaflow Systems — Internal Architecture Overview
+
+Nexaflow Systems is a B2B SaaS company founded in 2021, headquartered in Bengaluru.
+The company builds workflow automation software for mid-size logistics companies.
+
+Core product: NexaRoute 3.0
+NexaRoute is Nexaflow's flagship product. It uses a microservices architecture with
+the following components:
+
+- RouteEngine: The central orchestration service. Written in Go. Handles job
+  scheduling, priority queues, and SLA enforcement. Runs on Kubernetes with
+  horizontal pod autoscaling triggered at 70% CPU.
+
+- DataBridge: An ETL pipeline service written in Python (FastAPI). Ingests shipment
+  data from partner APIs (DHL, FedEx, BlueDart) via webhooks. Normalises data into
+  Nexaflow's internal ShipmentEvent schema before forwarding to RouteEngine.
+
+- AuditLedger: An append-only event log backed by Apache Kafka. Every RouteEngine
+  decision is written here for compliance. Retention is 7 years per logistics
+  industry regulations.
+
+- NexaQL: Nexaflow's internal query language for filtering shipment events. Syntax
+  is similar to SQL but with extensions for geofencing queries (WITHIN_RADIUS,
+  INTERSECTS_ZONE).
+
+Deployment:
+All services run on AWS (ap-south-1 region). DataBridge uses RDS PostgreSQL 15 as
+its primary store. RouteEngine uses Redis Cluster for distributed locking.
+AuditLedger Kafka cluster has 6 brokers with replication factor 3.
+
+Known issues as of Q3 2024:
+- DataBridge webhook retry logic has a race condition when two partner APIs send
+  duplicate events within 200ms. Ticket NEX-4821 is open.
+- NexaQL INTERSECTS_ZONE queries are O(n²) for zones with >500 polygon vertices.
+  Workaround: pre-simplify zone polygons to <200 vertices before storing.
+
+On-call rotation: Engineering on-call is managed via PagerDuty. Escalation path is
+L1 (on-call engineer) → L2 (team lead) → L3 (CTO). SLA for P1 incidents is 15
+minutes acknowledgement, 2 hours resolution.

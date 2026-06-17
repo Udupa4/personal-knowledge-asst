@@ -1,0 +1,42 @@
+Nexaflow Incident Report — INC-2024-0892
+
+Date: 2024-09-14
+Severity: P1
+Duration: 47 minutes (14:23 IST to 15:10 IST)
+Reported by: Priya Nair (SRE team)
+Status: Resolved. Post-mortem complete.
+
+Summary:
+RouteEngine pods began OOMKilling across all 3 production nodes simultaneously.
+NexaRoute processing dropped to 0 for 47 minutes. Approximately 2,300 shipment
+events were delayed. No data loss occurred due to AuditLedger's Kafka durability.
+
+Root cause:
+A NexaQL query introduced in deployment NX-1.4.7 (deployed 14:15 IST same day)
+contained an INTERSECTS_ZONE predicate against a zone with 812 polygon vertices.
+This triggered the known O(n²) performance issue documented in NEX-4821 and the
+nexaflow_architecture document. Memory usage spiked to 94% within 8 minutes of
+deployment, triggering OOMKills.
+
+Timeline:
+14:15 — NX-1.4.7 deployed to production by automated GitOps pipeline
+14:23 — PagerDuty alert fired: RouteEngine pod restarts >3 in 5 minutes
+14:28 — On-call engineer (Rahul Desai) acknowledged. Escalated to L2 immediately.
+14:35 — Rollback to NX-1.4.6 initiated
+14:42 — Rollback complete. Pod restarts ceased.
+15:10 — All delayed shipment events processed. Incident closed.
+
+Action items:
+1. Add a pre-deploy validation step that rejects NexaQL queries with zone polygons
+   exceeding 200 vertices. Assigned to DataBridge team. Due: 2024-10-01.
+2. Investigate whether Kubernetes 1.29 VPA (Vertical Pod Autoscaler) would have
+   detected and mitigated the memory spike faster. Research task assigned to
+   platform team. Due: 2024-10-15.
+3. Update runbook for OOMKill incidents to include NexaQL polygon complexity as
+   a diagnostic step.
+
+Lessons learned:
+The incident was recoverable quickly due to AuditLedger's event durability and
+the rollback capability of the GitOps pipeline. The core issue (NEX-4821) was
+known but had no automated enforcement. Human review alone is insufficient for
+catching polygon complexity issues at deploy time.

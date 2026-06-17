@@ -1,0 +1,34 @@
+Nexaflow Engineering — External Dependencies and Versioning Policy
+
+This document tracks third-party dependencies that Nexaflow services rely on,
+along with our internal policy for version upgrades.
+
+Upgrade policy:
+- Security patches: must be applied within 72 hours of CVE disclosure.
+- Minor versions: evaluated quarterly. Upgrade requires passing the full
+  NexaRoute integration test suite (3,400 tests, ~18 minute runtime).
+- Major versions: require a dedicated migration spike, architecture review,
+  and sign-off from the platform team lead (currently Arjun Menon).
+
+Current pinned versions (as of internal audit, September 2024):
+- Python: 3.11.6
+- FastAPI: 0.103.2
+- Redis client (redis-py): 5.0.1
+- Kafka client (confluent-kafka): 2.3.0
+- SQLAlchemy: 2.0.21
+- Pydantic: 2.4.2
+- Go (RouteEngine): 1.21.1
+- Kubernetes: 1.28.2
+
+Pending upgrades flagged by the platform team:
+- FastAPI has released versions beyond 0.103.2. The platform team needs to
+  evaluate whether async lifespan changes in newer versions affect DataBridge.
+- Pydantic v2 migration is complete but some internal validator patterns may
+  need review against the latest Pydantic documentation.
+- The team wants to understand the current stable release of Python 3.12
+  and whether the free-threaded mode (PEP 703) is production-ready.
+
+Questions to research before next quarterly review:
+1. What is the latest stable release of FastAPI and what changed since 0.103.2?
+2. Is Python 3.12 free-threaded mode considered production-ready as of late 2024?
+3. What are the current open CVEs for redis-py 5.0.1 if any?

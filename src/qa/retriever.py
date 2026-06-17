@@ -11,7 +11,7 @@ from langchain_core.documents import Document
 from langchain_classic.retrievers import ParentDocumentRetriever
 from langchain_core.stores import InMemoryStore
 
-from src.common.utils.embeddings import select_embeddings
+from src.utils.embeddings import select_embeddings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

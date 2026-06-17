@@ -15,8 +15,8 @@ DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5-coder:14b")
 
-DEFAULT_MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "2048"))
-DEFAULT_TEMPERATURE = 0.0
+DEFAULT_MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "32000"))
+DEFAULT_TEMPERATURE = 0.7
 
 
 def get_llm(temperature: float = DEFAULT_TEMPERATURE, max_tokens: int = DEFAULT_MAX_TOKENS):

@@ -6,7 +6,7 @@ from typing import Dict, Any, List
 from redis import asyncio as aioredis
 import logging
 
-from src.common.utils.singletone import SingletonMeta
+from src.utils.singletone import SingletonMeta
 from src.memory.ltm_manager import LtmManager
 from src.memory.summarizer import summarize_turns
 

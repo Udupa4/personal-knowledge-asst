@@ -11,13 +11,7 @@ logger = logging.getLogger(__name__)
 
 class RouterDecision(BaseModel):
     route: str = Field(
-        description=(
-            "One of: 'rag', 'memory_only', 'rag_and_memory', 'clarify'. "
-            "Choose 'rag' if the question is about factual topics in the knowledge base. "
-            "Choose 'memory_only' if the question is about past conversations or personal context. "
-            "Choose 'rag_and_memory' if both knowledge and personal context are needed. "
-            "Choose 'clarify' if the question is too vague or ambiguous to answer without more info."
-        )
+        description="Either 'agent' (attempt to answer) or 'clarify' (too vague)."
     )
     reasoning: str = Field(
         description="One sentence explaining why you chose this route."
@@ -29,21 +23,16 @@ class RouterDecision(BaseModel):
 # Temperature is 0.0 (set in get_llm default) for consistent routing.
 
 ROUTER_SYSTEM_PROMPT = """You are a query router for a personal knowledge assistant.
-Your job is to classify the user's question into exactly one routing category.
-You are NOT answering the question — only deciding how it should be handled.
+Classify the user's question into exactly one of two categories:
 
-Routing rules:
-- "rag"            → question asks about factual topics, documents, or knowledge base content
-- "memory_only"    → question asks about past conversations, what was discussed, or personal context
-- "rag_and_memory" → question needs both knowledge base content AND personal/conversational context
-- "clarify"        → question is too vague, ambiguous, or incomplete to route confidently
+- "agent"   → the question can be answered (possibly with tool use)
+- "clarify" → the question is too vague or incomplete to attempt an answer
 
-You will be given:
-- The user's question
-- A summary of recent conversation turns (STM), if any
-- A summary of long-term memory about this user (LTM), if any
-
-Use the context to inform your routing decision but do not answer the question itself."""
+You are NOT answering the question — only deciding whether to attempt it.
+Output "clarify" only when the question is genuinely unanswerable without 
+more information (e.g. single words, pronouns with no referent, pure noise).
+When in doubt, output "agent" — the agent has tools to find what it needs.
+"""
 
 
 def _build_router_input(state: AgentState) -> str:

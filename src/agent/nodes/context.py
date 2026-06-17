@@ -42,7 +42,7 @@ async def load_context_node(state: AgentState) -> dict:
             f"load_context_node: session={state['session_id']} "
             f"stm_turns={len(stm_context)} ltm_memories={len(ltm_context)}"
         )
-        return {"stm_context": stm_context, "ltm_context": ltm_context}
+        return {"stm_context": stm_context, "ltm_context": ltm_context, "retrieved_docs": []}
 
     except Exception as e:
         logger.error(f"load_context_node failed: {e}")
