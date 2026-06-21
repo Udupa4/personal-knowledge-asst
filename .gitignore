@@ -6,3 +6,4 @@ data/.ingest_manifest.json
 data/.docstore.pkl
 chroma_store/
 ltm_store/
+gcp-credentials.json

@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, Depends
 from langchain_core.messages import AIMessage, ToolMessage
 
-from src.auth.auth import require_api_key
+from src.auth.dependencies import get_current_user, CurrentUser
 from src.dto.qa_dto import QAIn, QAResp, EvidenceItem
 from src.agent.graph import graph
 from src.agent.tools import UserContext
@@ -79,12 +79,12 @@ def _extract_retrieved_docs(final_state: dict) -> list:
     return docs
 
 
-@router.post("/agent/qa", response_model=QAResp, dependencies=[Depends(require_api_key)])
-async def agent_qa(payload: QAIn):
+@router.post("/agent/qa", response_model=QAResp)
+async def agent_qa(payload: QAIn, current_user: CurrentUser = Depends(get_current_user)):
     initial_state = {
         "question": payload.question,
         "session_id": payload.session_id,
-        "user_id": payload.user_id,
+        "user_id": current_user.user_id,
         "top_k": payload.top_k,
         "route": "",
         "route_reasoning": "",
@@ -98,7 +98,7 @@ async def agent_qa(payload: QAIn):
         "messages": [],
     }
 
-    final_state = await graph.ainvoke(initial_state, context=UserContext(payload.user_id))
+    final_state = await graph.ainvoke(initial_state, context=UserContext(current_user.user_id))
     answer = _extract_final_answer(final_state)
     retrieved_docs = _extract_retrieved_docs(final_state)
 

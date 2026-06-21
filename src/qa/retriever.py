@@ -9,7 +9,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_classic.retrievers import ParentDocumentRetriever
-from langchain_core.stores import InMemoryStore
+from langchain_community.storage import RedisStore
 
 from src.utils.embeddings import select_embeddings
 
@@ -40,8 +40,10 @@ class ChunkedDocLoader:
     def _load_manifest() -> dict:
         """Load the ingest manifest tracking which files have been ingested."""
         if os.path.exists(MANIFEST_PATH):
+            logger.info(f"Loading manifest from: {MANIFEST_PATH}")
             with open(MANIFEST_PATH, "r") as f:
                 return json.load(f)
+        logger.info(f"Manifest not found in path: {MANIFEST_PATH}")
         return {}
 
     @staticmethod
@@ -126,7 +128,7 @@ class VectorRetriever:
         self.persist_directory = persist_directory
         self.vectordb: Optional[Chroma] = None
         self.embeddings = select_embeddings()
-        self.docstore: InMemoryStore = self._load_docstore()
+        self.docstore: RedisStore = self._build_docstore()
         self.parent_retriever: Optional[ParentDocumentRetriever] = None
 
         # Child splitter: small chunks → precise embedding & retrieval
@@ -140,26 +142,15 @@ class VectorRetriever:
             chunk_overlap=200
         )
 
-    # --- Docstore persistence ---
+    # --- Docstore persistence for parent chunks in Redis ---
     @staticmethod
-    def _load_docstore() -> InMemoryStore:
-        """Load persisted parent docstore from disk if it exists."""
-        if os.path.exists(DOCSTORE_PATH):
-            try:
-                with open(DOCSTORE_PATH, "rb") as f:
-                    store = pickle.load(f)
-                logger.info("Loaded parent docstore from disk.")
-                return store
-            except Exception as ex:
-                logger.warning(f"Failed to load docstore, starting fresh: {ex}")
-        return InMemoryStore()
-
-    def _save_docstore(self):
-        """Persist the in-memory parent docstore to disk."""
-        os.makedirs(os.path.dirname(DOCSTORE_PATH), exist_ok=True)
-        with open(DOCSTORE_PATH, "wb") as f:
-            pickle.dump(self.docstore, f)
-        logger.info("Saved parent docstore to disk.")
+    def _build_docstore() -> RedisStore:
+        redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+        return RedisStore(
+            redis_url=redis_url,
+            namespace="docstore:parent",
+            ttl=None,
+        )
 
     # --- Chroma helpers ---
     def _chroma_exists(self) -> bool:
@@ -201,7 +192,6 @@ class VectorRetriever:
             if add_new and docs:
                 logger.info(f"Adding {len(docs)} new documents to existing store.")
                 self.parent_retriever.add_documents(docs)
-                self._save_docstore()
                 logger.info("New documents added and docstore saved.")
             elif not docs:
                 logger.info("No new documents to add.")
@@ -216,7 +206,6 @@ class VectorRetriever:
             )
             self.parent_retriever = self._build_parent_retriever()
             self.parent_retriever.add_documents(docs)
-            self._save_docstore()
             logger.info("Chroma store and docstore created and saved.")
 
     # --- Retrieval ---
