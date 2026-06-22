@@ -4,6 +4,7 @@ load_dotenv()
 import logging
 import uvicorn
 from fastapi import FastAPI
+from src.router.auth_router import router as auth_router
 from src.router.session_router import router as session_router
 from src.router.agent_router import router as agent_router
 from src.router.memory_router import router as memory_router
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Personal Copilot (Phase 2)")
 
+app.include_router(auth_router)
 app.include_router(session_router)
 app.include_router(agent_router)
 app.include_router(memory_router)

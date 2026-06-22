@@ -15,7 +15,7 @@ _ltm = LtmManager()
 # Initialize retriever
 _loader = ChunkedDocLoader(chunk_size=800, chunk_overlap=200)
 _retriever = VectorRetriever()
-_docs = _loader.load_and_split()
+_docs = _loader.load_and_split(only_new=True)
 _retriever.build_or_load(_docs)
 
 tavily = TavilySearchResults(max_results=3)
