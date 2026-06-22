@@ -10,6 +10,7 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_classic.retrievers import ParentDocumentRetriever
 from langchain_community.storage import RedisStore
+from langchain_classic.storage._lc_store import create_kv_docstore
 
 from src.utils.embeddings import select_embeddings
 
@@ -144,13 +145,14 @@ class VectorRetriever:
 
     # --- Docstore persistence for parent chunks in Redis ---
     @staticmethod
-    def _build_docstore() -> RedisStore:
+    def _build_docstore():
         redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-        return RedisStore(
+        byte_store = RedisStore(
             redis_url=redis_url,
             namespace="docstore:parent",
             ttl=None,
         )
+        return create_kv_docstore(byte_store)
 
     # --- Chroma helpers ---
     def _chroma_exists(self) -> bool:
