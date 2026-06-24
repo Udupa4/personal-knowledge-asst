@@ -1,12 +1,13 @@
 import os
 import logging
-import pickle
 import json
 import hashlib
 from typing import List, Dict, Any, Optional
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, VectorParams
 from langchain_core.documents import Document
 from langchain_classic.retrievers import ParentDocumentRetriever
 from langchain_community.storage import RedisStore
@@ -24,11 +25,25 @@ except Exception as e:
     GoogleGenerativeAIEmbeddings = None
 
 DATA_DIR = "./data/docs"
+COLLECTION_PREFIX = "rag"
 CHROMA_PERSIST_DIR = os.environ.get("CHROMA_PERSIST_DIR", "./chroma_store")
 DEFAULT_EMBEDDING_MODEL = os.environ.get("GEMINI_EMBEDDING_MODEL", "models/gemini-embedding-001")
 GOOGLE_API_KEY = None
 MANIFEST_PATH = "./data/.ingest_manifest.json"
-DOCSTORE_PATH = "./data/.docstore.pkl"     # persisted parent docstore
+
+def _get_qdrant_client() -> QdrantClient:
+    return QdrantClient(
+        url=os.environ.get("QDRANT_URL"),
+        api_key=os.environ.get("QDRANT_API_KEY"),
+    )
+
+_qdrant_client: Optional[QdrantClient] = None
+
+def get_qdrant_client() -> QdrantClient:
+    global _qdrant_client
+    if _qdrant_client is None:
+        _qdrant_client = _get_qdrant_client()
+    return _qdrant_client
 
 class ChunkedDocLoader:
     def __init__(self, chunk_size: int = 800, chunk_overlap: int = 200):
@@ -125,11 +140,12 @@ class ChunkedDocLoader:
         return docs
 
 class VectorRetriever:
-    def __init__(self, persist_directory: str = CHROMA_PERSIST_DIR):
-        self.persist_directory = persist_directory
-        self.vectordb: Optional[Chroma] = None
+    def __init__(self, user_id: str):
+        self.user_id = user_id
+        self.collection_name = f"{COLLECTION_PREFIX}_{user_id}"
         self.embeddings = select_embeddings()
         self.docstore: RedisStore = self._build_docstore()
+        self.vectordb: Optional[QdrantVectorStore] = None
         self.parent_retriever: Optional[ParentDocumentRetriever] = None
 
         # Child splitter: small chunks → precise embedding & retrieval
@@ -144,19 +160,36 @@ class VectorRetriever:
         )
 
     # --- Docstore persistence for parent chunks in Redis ---
-    @staticmethod
-    def _build_docstore():
+    def _build_docstore(self):
         redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
         byte_store = RedisStore(
             redis_url=redis_url,
-            namespace="docstore:parent",
+            namespace=f"docstore:{self.user_id}",
             ttl=None,
         )
         return create_kv_docstore(byte_store)
 
-    # --- Chroma helpers ---
-    def _chroma_exists(self) -> bool:
-        return os.path.exists(os.path.join(self.persist_directory, "chroma.sqlite3"))
+    def _collection_exists(self) -> bool:
+        client = get_qdrant_client()
+        existing = [c.name for c in client.get_collections().collections]
+        return self.collection_name in existing
+
+    def _build_vectordb(self) -> QdrantVectorStore:
+        client = get_qdrant_client()
+        if not self._collection_exists():
+            client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=VectorParams(
+                    size=384,  # Gemini embedding-001 outputs 768 dimensional embedding
+                    distance=Distance.COSINE,
+                )
+            )
+            logger.info(f"Created Qdrant collection: {self.collection_name}")
+        return QdrantVectorStore(
+            client=client,
+            collection_name=self.collection_name,
+            embedding=self.embeddings,
+        )
 
     def _build_parent_retriever(self) -> ParentDocumentRetriever:
         """Construct the ParentDocumentRetriever from current vectordb + docstore."""
@@ -167,48 +200,13 @@ class VectorRetriever:
             parent_splitter=self._parent_splitter,
         )
 
-    # --- Build / Load ---
     def build_or_load(self, docs: List[Document], add_new: bool = False):
-        """
-        Load an existing Chroma store or create one from full documents.
+        self.vectordb = self._build_vectordb()  # creates collection if not exists
+        self.parent_retriever = self._build_parent_retriever()
 
-        The ParentDocumentRetriever handles splitting internally:
-          - Small child chunks are embedded → stored in ChromaDB
-          - Large parent chunks are stored in docstore (persisted via pickle)
-
-        Args:
-            docs:    Full Documents (one per file) from ChunkedDocLoader.
-            add_new: If True and store exists, add only new docs.
-                     If False, load existing store without modification.
-        """
-        os.makedirs(self.persist_directory, exist_ok=True)
-
-        if self._chroma_exists():
-            logger.info("Found existing Chroma store — loading from disk.")
-            self.vectordb = Chroma(
-                persist_directory=self.persist_directory,
-                embedding_function=self.embeddings
-            )
-            self.parent_retriever = self._build_parent_retriever()
-
-            if add_new and docs:
-                logger.info(f"Adding {len(docs)} new documents to existing store.")
-                self.parent_retriever.add_documents(docs)
-                logger.info("New documents added and docstore saved.")
-            elif not docs:
-                logger.info("No new documents to add.")
-        else:
-            if not docs:
-                logger.warning("No docs provided and no existing Chroma store found.")
-                return
-            logger.info(f"Creating new Chroma store from {len(docs)} documents.")
-            self.vectordb = Chroma(
-                persist_directory=self.persist_directory,
-                embedding_function=self.embeddings
-            )
-            self.parent_retriever = self._build_parent_retriever()
+        if docs and add_new:
+            logger.info(f"Ingesting {len(docs)} docs for user {self.user_id}")
             self.parent_retriever.add_documents(docs)
-            logger.info("Chroma store and docstore created and saved.")
 
     # --- Retrieval ---
     def retrieve(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
@@ -216,8 +214,8 @@ class VectorRetriever:
         Retrieve top-k relevant parent chunks for a query.
 
         Flow:
-          1. Child chunks are searched in ChromaDB by vector similarity
-          2. Their parent chunks are fetched from the docstore
+          1. Child chunks are searched in QdrantDB by vector similarity
+          2. Their parent chunks are fetched from the RedisStore
           3. Parent chunks (large, full context) are returned to the LLM
 
         Returns a list of dicts with title, filename, path, and full content.
@@ -227,7 +225,7 @@ class VectorRetriever:
             return []
 
         # ParentDocumentRetriever.invoke() returns parent Documents directly
-        # search_kwargs controls how many children are searched in ChromaDB
+        # search_kwargs controls how many children are searched in QdrantDB
         self.parent_retriever.search_kwargs = {"k": top_k * 2}  # fetch more children to get top_k parents
         parent_docs = self.parent_retriever.invoke(query)
 

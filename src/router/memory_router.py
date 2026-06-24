@@ -11,11 +11,6 @@ router = APIRouter(prefix="/memory", tags=["memory"])
 ltm_mm = LtmManager()
 
 @router.get("/ltm")
-async def get_all_ltm(current_user: CurrentUser = Depends(get_current_user)):
-    """Get all LTM entries across all users, grouped by user_id."""
-    return ltm_mm.get_all()
-
-@router.get("/ltm")
 async def get_ltm_for_user(current_user: CurrentUser = Depends(get_current_user)):
     """Get all LTM saved for a specific user."""
     return ltm_mm.get_all_for_user(current_user.user_id)
