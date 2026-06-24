@@ -12,12 +12,6 @@ logger = logging.getLogger(__name__)
 # Initialise ltm manager
 _ltm = LtmManager()
 
-# Initialize retriever
-_loader = ChunkedDocLoader(chunk_size=800, chunk_overlap=200)
-_retriever = VectorRetriever()
-_docs = _loader.load_and_split(only_new=True)
-_retriever.build_or_load(_docs)
-
 tavily = TavilySearchResults(max_results=3)
 
 @dataclass
@@ -25,7 +19,7 @@ class UserContext:
     user_id: str
 
 @tool
-def search_knowledge_base(query: str) -> str:
+def search_knowledge_base(query: str, runtime: ToolRuntime[UserContext]) -> str:
     """
         Search the personal knowledge base for factual information. Use this when the question requires information
         from stored documents.
@@ -34,15 +28,13 @@ def search_knowledge_base(query: str) -> str:
             most relevant document snippets found. If no relevant documents are found, returns a not-found message.
     """
     try:
-        docs = _retriever.retrieve(query)
+        user_id = runtime.context.user_id
+        retriever = VectorRetriever(user_id=user_id)
+        retriever.build_or_load(docs=[], add_new=False)  # load only, no ingest
+        docs = retriever.retrieve(query)
         if not docs:
-            return f"No relevant documents found for the query."
-
-        parts = []
-        for doc in docs:
-            parts.append(f"[{doc['filename']}]\n{doc['snippet']}")
-
-        return "\n\n".join(parts)
+            return "No relevant documents found for the query."
+        return "\n\n".join(f"[{d['filename']}]\n{d['snippet']}" for d in docs)
     except Exception as e:
         logger.error(f"search_knowledge_base failed: {e}")
         return f"Knowledge base search failed: {e}"

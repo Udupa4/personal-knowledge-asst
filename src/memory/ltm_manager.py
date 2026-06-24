@@ -1,8 +1,10 @@
 import os
 import logging
 from typing import List
-from langchain_chroma import Chroma
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client.models import Filter, FieldCondition, MatchValue, PayloadSchemaType
 
+from src.qa.retriever import get_qdrant_client
 from src.utils.embeddings import select_embeddings
 from src.utils.singletone import SingletonMeta
 
@@ -10,14 +12,30 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 LTM_PERSIST_DIR = os.environ.get("LTM_PERSIST_DIR", "./ltm_store")
+LTM_COLLECTION = "ltm"
+VECTOR_SIZE = 384
 
 class LtmManager(metaclass=SingletonMeta):
     def __init__(self):
         self.embeddings = select_embeddings()
-        self.ltm_store = Chroma(
-            collection_name="ltm",
-            embedding_function=self.embeddings,
-            persist_directory=LTM_PERSIST_DIR
+        client = get_qdrant_client()
+        # Create collection if it doesn't exist
+        existing = [c.name for c in client.get_collections().collections]
+        if LTM_COLLECTION not in existing:
+            from qdrant_client.models import Distance, VectorParams
+            client.create_collection(
+                collection_name=LTM_COLLECTION,
+                vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE)
+            )
+        client.create_payload_index(
+            collection_name=LTM_COLLECTION,
+            field_name="metadata.user_id",
+            field_schema=PayloadSchemaType.KEYWORD,
+        )
+        self.ltm_store = QdrantVectorStore(
+            client=client,
+            collection_name=LTM_COLLECTION,
+            embedding=self.embeddings,
         )
 
     def save(self, summary: str, user_id: str, session_id: str):
@@ -29,52 +47,43 @@ class LtmManager(metaclass=SingletonMeta):
         logger.info(f"LTM saved for user_id='{user_id}', session_id='{session_id}'")
 
     def retrieve(self, query: str, user_id: str, k: int = 3) -> List[str]:
-        # Use explicit $eq operator — shorthand dict filter is unreliable in ChromaDB
-        where_filter = {"user_id": {"$eq": user_id}}
-
-        # Guard: check how many docs exist for this user before querying
-        try:
-            existing = self.ltm_store._collection.get(where=where_filter)
-            available = len(existing["ids"])
-        except Exception as ex:
-            logger.error(f"Failed to retrieve available memory for user {user_id}. {ex}")
-            available = 0
-
-        if available == 0:
-            return []
-
-        safe_k = min(k, available)  # never request more than what exists
-
+        qdrant_filter = Filter(
+            must=[FieldCondition(key="metadata.user_id", match=MatchValue(value=user_id))]
+        )
         results = self.ltm_store.similarity_search(
-            query, k=safe_k, filter=where_filter
+            query, k=k, filter=qdrant_filter
         )
         return [r.page_content for r in results]
 
-    def get_all(self) -> dict:
-        """Fetch all documents from LTM store, grouped by user_id."""
-        raw = self.ltm_store._collection.get(include=["documents", "metadatas"])
-        grouped = {}
-        for doc, meta in zip(raw["documents"], raw["metadatas"]):
-            uid = meta.get("user_id", "unknown")
-            grouped.setdefault(uid, []).append({
-                "summary": doc,
-                "session_id": meta.get("session_id"),
-            })
-        return grouped
-
-    def get_all_for_user(self, user_id: str) -> list:
-        """Fetch all LTM documents for a specific user."""
-        raw = self.ltm_store._collection.get(
-            where={"user_id": {"$eq": user_id}},
-            include=["documents", "metadatas"]
+    @staticmethod
+    def get_all_for_user(user_id: str) -> list:
+        client = get_qdrant_client()
+        results, _ = client.scroll(
+            collection_name=LTM_COLLECTION,
+            scroll_filter=Filter(
+                must=[FieldCondition(key="metadata.user_id", match=MatchValue(value=user_id))]
+            ),
+            with_payload=True,
+            limit=100,
         )
         return [
-            {"id": i, "summary": d, "session_id": m.get("session_id")}
-            for i, d, m in zip(raw["ids"], raw["documents"], raw["metadatas"])
+            {
+                "id": str(r.id),
+                "summary": r.payload.get("metadata", {}).get("page_content", ""),
+                "session_id": r.payload.get("metadata", {}).get("session_id"),
+            }
+            for r in results
         ]
 
-    def delete_for_user(self, user_id: str):
-        """Delete all LTM entries for a given user."""
-        raw = self.ltm_store._collection.get(where={"user_id": {"$eq": user_id}})
-        if raw["ids"]:
-            self.ltm_store._collection.delete(ids=raw["ids"])
+    @staticmethod
+    def delete_for_user(user_id: str):
+        client = get_qdrant_client()
+        from qdrant_client.models import FilterSelector
+        client.delete(
+            collection_name=LTM_COLLECTION,
+            points_selector=FilterSelector(
+                filter=Filter(
+                    must=[FieldCondition(key="metadata.user_id", match=MatchValue(value=user_id))]
+                )
+            )
+        )
