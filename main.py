@@ -4,6 +4,8 @@ load_dotenv()
 import logging
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from src.router.auth_router import router as auth_router
 from src.router.ingest_router import router as ingest_router
 from src.router.session_router import router as session_router
@@ -23,6 +25,14 @@ app.include_router(agent_router)
 app.include_router(memory_router)
 
 app.add_event_handler("shutdown", custom_shutdown_event_handler())
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 if __name__ == "__main__":
     # Use uvicorn for now for development

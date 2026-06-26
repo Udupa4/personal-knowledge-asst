@@ -28,3 +28,7 @@ tavily-python
 argon2-cffi
 python-jose[cryptography]
 google-cloud-firestore
+
+# UI packages
+streamlit>=1.35.0
+httpx>=0.27.0

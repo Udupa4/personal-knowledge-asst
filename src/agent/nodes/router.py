@@ -74,6 +74,7 @@ async def router_node(state: AgentState) -> dict:
         ]
 
         decision: RouterDecision = await structured_llm.ainvoke(messages)
+        print(f"router decision: {decision}")
 
         logger.info(
             f"router_node: route={decision.route!r} "

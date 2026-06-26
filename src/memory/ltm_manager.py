@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import datetime, timezone
 from typing import List
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client.models import Filter, FieldCondition, MatchValue, PayloadSchemaType
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 LTM_PERSIST_DIR = os.environ.get("LTM_PERSIST_DIR", "./ltm_store")
 LTM_COLLECTION = "ltm"
-VECTOR_SIZE = 384
+VECTOR_SIZE = 3072 if os.environ.get("EMBEDDING_PROVIDER", "") == "gemini" else 1024
 
 class LtmManager(metaclass=SingletonMeta):
     def __init__(self):
@@ -42,7 +43,11 @@ class LtmManager(metaclass=SingletonMeta):
         """Save the summary to the ltm store"""
         self.ltm_store.add_texts(
             texts=[summary],
-            metadatas=[{"user_id": user_id, "session_id": session_id}]
+            metadatas=[{
+                "user_id": user_id,
+                "session_id": session_id,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }]
         )
         logger.info(f"LTM saved for user_id='{user_id}', session_id='{session_id}'")
 
@@ -69,8 +74,9 @@ class LtmManager(metaclass=SingletonMeta):
         return [
             {
                 "id": str(r.id),
-                "summary": r.payload.get("metadata", {}).get("page_content", ""),
+                "summary": r.payload.get("page_content", ""),
                 "session_id": r.payload.get("metadata", {}).get("session_id"),
+                "created_at": r.payload.get("metadata", {}).get("created_at"),
             }
             for r in results
         ]
