@@ -53,14 +53,10 @@ async def agent_node(state: AgentState) -> dict:
         if not state.get("messages"):
             initial_messages = _build_initial_messages(state)
             response = await llm.ainvoke(initial_messages)
-            for msg in state["messages"]:
-                print(msg)
             return {"messages": initial_messages + [response]}
         else:
             messages = state["messages"]
             response = await llm.ainvoke(messages)
-            for msg in state["messages"]:
-                print(msg)
             return {"messages": [response]}
 
     except Exception as e:

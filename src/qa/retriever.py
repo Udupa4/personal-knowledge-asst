@@ -26,8 +26,8 @@ except Exception as e:
 
 DATA_DIR = "./data/docs"
 COLLECTION_PREFIX = "rag"
-CHROMA_PERSIST_DIR = os.environ.get("CHROMA_PERSIST_DIR", "./chroma_store")
 DEFAULT_EMBEDDING_MODEL = os.environ.get("GEMINI_EMBEDDING_MODEL", "models/gemini-embedding-001")
+VECTOR_SIZE = 3072 if os.environ.get("EMBEDDING_PROVIDER", "") == "gemini" else 1024
 GOOGLE_API_KEY = None
 MANIFEST_PATH = "./data/.ingest_manifest.json"
 
@@ -180,7 +180,7 @@ class VectorRetriever:
             client.create_collection(
                 collection_name=self.collection_name,
                 vectors_config=VectorParams(
-                    size=384,  # Gemini embedding-001 outputs 768 dimensional embedding
+                    size=VECTOR_SIZE,  # Gemini embedding-001 outputs 768 dimensional embedding
                     distance=Distance.COSINE,
                 )
             )
@@ -233,6 +233,7 @@ class VectorRetriever:
         seen_sources = set()
         out = []
         for doc in parent_docs:
+            print(doc)
             source = doc.metadata.get("source", "")
             if source in seen_sources:
                 continue

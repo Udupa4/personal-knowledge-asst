@@ -1,4 +1,5 @@
 import logging
+from typing import List
 from fastapi import APIRouter, Depends
 from langchain_core.messages import AIMessage, ToolMessage
 
@@ -78,6 +79,22 @@ def _extract_retrieved_docs(final_state: dict) -> list:
 
     return docs
 
+def _extract_tools_used(final_state: dict) -> List[str]:
+    """
+    Walk all messages and collect unique tool names from ToolMessage instances.
+    Preserves first-seen order. One /agent/qa call = one agent turn, so no
+    multi-turn scoping needed.
+    """
+    seen = set()
+    tools = []
+    for msg in final_state.get("messages", []):
+        if isinstance(msg, ToolMessage) and msg.name:
+            if msg.name not in seen:
+                seen.add(msg.name)
+                tools.append(msg.name)
+                print(f"tool: {msg.name}")
+    return tools
+
 
 @router.post("/agent/qa", response_model=QAResp)
 async def agent_qa(payload: QAIn, current_user: CurrentUser = Depends(get_current_user)):
@@ -108,4 +125,5 @@ async def agent_qa(payload: QAIn, current_user: CurrentUser = Depends(get_curren
         stm_context=final_state.get("stm_context", []),
         ltm_context=final_state.get("ltm_context", []),
         metadata=final_state.get("metadata", {}),
+        tools_used=_extract_tools_used(final_state),
     )

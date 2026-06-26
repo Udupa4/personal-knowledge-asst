@@ -83,10 +83,9 @@ class StmMemoryManager(metaclass=SingletonMeta):
         turns = await self.read_stm(session_id, k=20)
 
         if not turns:
-            return "No summary found"
-
-        summary = await summarize_turns(turns)
-        if summary:
+            summary = "No summary found"
+        else:
+            summary = await summarize_turns(turns)
             logger.info(f"Saving summary to LTM: {session_id}:{user_id}")
             ltm.save(summary, user_id, session_id)
         await self.clear_session(session_id)

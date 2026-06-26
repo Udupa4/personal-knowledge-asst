@@ -17,3 +17,4 @@ class QAResp(BaseModel):
     stm_context: List[Dict[str, Any]]
     ltm_context: List[str]
     metadata: Optional[Dict[str, Any]] = None
+    tools_used: List[str]
