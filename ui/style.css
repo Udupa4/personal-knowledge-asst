@@ -300,8 +300,14 @@ html, body {
   transition: all 0.15s;
 }
 
-.session-item:hover .session-delete { opacity: 1; }
-.session-delete:hover { color: var(--danger); background: rgba(248,113,113,0.08); }
+.session-item:hover .session-delete { 
+  opacity: 1; 
+}
+
+.session-delete:hover { 
+  color: var(--danger); 
+  background: rgba(248, 113, 113, 0.08); 
+}
 
 /* sidebar bottom */
 .sidebar-bottom {
@@ -785,6 +791,88 @@ html, body {
   text-align: center;
   line-height: 1.8;
 }
+
+/* ── files view ─────────────────────────────────────────────────────────── */
+.file-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  transition: border-color 0.15s;
+}
+
+.file-card:hover { 
+  border-color: #3a3a3a;
+}
+
+/* Reveal file delete button when hovering over the card */
+.file-card:hover .file-delete { 
+  opacity: 1; 
+}
+
+.file-icon { 
+  font-size: 20px; 
+  line-height: 1; 
+  flex-shrink: 0; 
+  padding-top: 2px; 
+}
+
+/* flex: 1 pushes the file-delete button neatly to the right margin */
+.file-meta { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 3px; 
+  min-width: 0; 
+  flex: 1; 
+}
+
+.file-name { 
+  font-size: 13px; 
+  font-weight: 500; 
+  white-space: nowrap; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  color: var(--text-primary); 
+}
+
+.file-details { 
+  font-size: 11px; 
+  color: var(--text-muted); 
+}
+
+/* Isolated file delete button styles */
+.file-delete {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center; /* Vertically centers button relative to card */
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  opacity: 1;
+  transition: all 0.15s;
+}
+
+.file-delete:hover { 
+  color: var(--danger); 
+  background: rgba(248, 113, 113, 0.08); 
+}
+
+/* Global status utilities */
+.files-empty, .files-loading { font-size: 13px; color: var(--text-muted); padding: 16px 0; text-align: center; }
+.upload-status { font-size: 12px; }
+.upload-status.uploading { color: var(--text-muted); }
+.upload-status.success { color: var(--success); }
+.upload-status.error { color: var(--danger); }
 
 /* ── chat header ────────────────────────────────────────────────────────── */
 .chat-header {

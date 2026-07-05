@@ -48,3 +48,6 @@ class FirestoreClient:
     # --- existence check ---
     def email_exists(self, email: str) -> bool:
         return self.get_user_by_email(email) is not None
+
+    def get_db(self):
+        return self._db

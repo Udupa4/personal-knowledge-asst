@@ -34,18 +34,22 @@ function showView(view) {
   document.getElementById("view-app").classList.toggle("hidden", view === "login");
 
   if (view !== "login") {
-    const isMemory = view === "memory";
-    document.getElementById("view-chat").classList.toggle("hidden", isMemory);
-    document.getElementById("view-memory").classList.toggle("hidden", !isMemory);
-    document.getElementById("nav-chat").classList.toggle("active", !isMemory);
-    document.getElementById("nav-memory").classList.toggle("active", isMemory);
+    document.getElementById("view-chat").classList.toggle("hidden", view !== "chat");
+    document.getElementById("view-memory").classList.toggle("hidden", view !== "memory");
+    document.getElementById("view-files").classList.toggle("hidden", view !== "files");
+
+    document.getElementById("nav-chat").classList.toggle("active", view === "chat");
+    document.getElementById("nav-memory").classList.toggle("active", view === "memory");
+    document.getElementById("nav-files").classList.toggle("active", view === "files");
   }
 }
 
 function switchView(view) {
   showView(view);
   if (view === "memory") loadMemory();
+  if (view === "files") loadFiles();
 }
+
 
 /* ── login tab switching ─────────────────────────────────────────────────── */
 document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -294,6 +298,9 @@ function updateEmptyState() {
   
   const messages = document.getElementById("chat-messages");
   messages.classList.toggle("hidden", !hasSession);
+
+  const inputArea = document.querySelector(".input-area");
+  if (inputArea) inputArea.classList.toggle("hidden", !hasSession);
 
   // Show a welcome message if the session is empty
   const emptyWelcome = document.getElementById("chat-new-welcome");
@@ -599,62 +606,216 @@ const TOOL_CONFIG = {
 };
 
 /* ── memory ──────────────────────────────────────────────────────────────── */
-async function loadMemory() {
+let cachedMemories = null;
+
+async function loadMemory(forceRefresh = false) {
   const list = document.getElementById("memory-list");
+
+  if (!forceRefresh && cachedMemories !== null) {
+    renderMemories(cachedMemories, list);
+    return;
+  }
+
   list.innerHTML = `<div class="memory-loading">loading memories…</div>`;
 
   try {
     const resp = await apiFetch("/memory/ltm");
-    const memories = await resp.json();
+    cachedMemories = await resp.json();
+    renderMemories(cachedMemories, list);
+  } catch (e) {
+    list.innerHTML = `<div class="memory-empty">failed to load memories.</div>`;
+  }
+}
 
-    if (!memories || memories.length === 0) {
-      list.innerHTML = `<div class="memory-empty">
-        no long-term memories yet.<br>
-        they're created automatically when sessions end.
-      </div>`;
+function renderMemories(memories, list) {
+  if (!memories || memories.length === 0) {
+    list.innerHTML = `<div class="memory-empty">
+      no long-term memories yet.<br>
+      they're created automatically when sessions end.
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = `<p style="font-size:12px;color:var(--text-muted);margin-bottom:4px">${memories.length} memor${memories.length === 1 ? "y" : "ies"} stored</p>`;
+
+  memories.forEach(mem => {
+    const card = document.createElement("div");
+    card.className = "memory-card";
+
+    const text = document.createElement("div");
+    text.className = "memory-text";
+    if (typeof marked !== "undefined" && typeof marked.parse === "function") {
+      text.innerHTML = marked.parse(mem.summary || "");
+    } else if (typeof marked === "function") {
+      text.innerHTML = marked(mem.summary || "");
+    } else {
+      text.textContent = mem.summary || "";
+    }
+
+    const footer = document.createElement("div");
+    footer.className = "memory-footer";
+
+    if (mem.created_at) {
+      const date = document.createElement("span");
+      date.className = "memory-date";
+      date.textContent = formatDate(mem.created_at);
+      footer.appendChild(date);
+    }
+
+    if (mem.session_id) {
+      const sess = document.createElement("span");
+      sess.className = "memory-session";
+      sess.textContent = `session ${mem.session_id.slice(0, 8)}`;
+      footer.appendChild(sess);
+    }
+
+    card.appendChild(text);
+    card.appendChild(footer);
+    list.appendChild(card);
+  });
+}
+
+/* ── files ───────────────────────────────────────────────────────────────── */
+async function loadFiles() {
+  const list = document.getElementById("files-list");
+  list.innerHTML = `<div class="files-loading">loading files…</div>`;
+
+  try {
+    const resp = await apiFetch("/ingest/files");
+    const files = await resp.json();
+
+    if (!Array.isArray(files) || files.length === 0) {
+      list.innerHTML = `<div class="files-empty">no files uploaded yet.</div>`;
       return;
     }
 
-    list.innerHTML = `<p style="font-size:12px;color:var(--text-muted);margin-bottom:4px">${memories.length} memor${memories.length === 1 ? "y" : "ies"} stored</p>`;
+    list.innerHTML = `<p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${files.length} file${files.length === 1 ? "" : "s"}</p>`;
 
-    memories.forEach(mem => {
-      const card = document.createElement("div");
-      card.className = "memory-card";
+    files.forEach(f => {
+  const card = document.createElement("div");
+  card.className = "file-card";
 
-      const text = document.createElement("div");
-      text.className = "memory-text";
-      if (typeof marked !== "undefined" && typeof marked.parse === "function") {
-        text.innerHTML = marked.parse(mem.summary || "");
-      } else if (typeof marked === "function") {
-        text.innerHTML = marked(mem.summary || "");
-      } else {
-        text.textContent = mem.summary || "";
-      }
+  const icon = document.createElement("span");
+  icon.className = "file-icon";
+  icon.textContent = fileIcon(f.mime_type, f.filename);
 
-      const footer = document.createElement("div");
-      footer.className = "memory-footer";
+  const meta = document.createElement("div");
+  meta.className = "file-meta";
 
-      if (mem.created_at) {
-        const date = document.createElement("span");
-        date.className = "memory-date";
-        date.textContent = formatDate(mem.created_at);
-        footer.appendChild(date);
-      }
+  const name = document.createElement("div");
+  name.className = "file-name";
+  name.textContent = f.filename;
+  name.title = f.filename;
 
-      if (mem.session_id) {
-        const sess = document.createElement("span");
-        sess.className = "memory-session";
-        sess.textContent = `session ${mem.session_id.slice(0, 8)}`;
-        footer.appendChild(sess);
-      }
+  const details = document.createElement("div");
+  details.className = "file-details";
+  details.textContent = `${formatBytes(f.size_bytes)} · ${f.chunk_count} chunk${f.chunk_count === 1 ? "" : "s"} · ${formatDate(f.uploaded_at)}`;
 
-      card.appendChild(text);
-      card.appendChild(footer);
-      list.appendChild(card);
+  // Renamed class to 'file-delete' for proper architectural separation
+  const delBtn = document.createElement("button");
+  delBtn.className = "file-delete"; 
+  delBtn.title = "delete file";
+  delBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+    <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+  </svg>`;
+  
+  delBtn.onclick = async (e) => {
+    e.stopPropagation();
+    if (confirm(`Are you sure you want to delete ${f.filename}?`)) {
+      await deleteFile(f.file_id);
+    }
+  };
+
+  meta.appendChild(name);
+  meta.appendChild(details);
+  card.appendChild(icon);
+  card.appendChild(meta);
+  card.appendChild(delBtn); // Appended after meta so it sits on the right end
+  list.appendChild(card);
+});
+  } catch (e) {
+    list.innerHTML = `<div class="files-empty">failed to load files.</div>`;
+  }
+}
+
+function fileIcon(mimeType, filename) {
+  const ext = (filename || "").split(".").pop().toLowerCase();
+  if (mimeType === "application/pdf" || ext === "pdf") return "📄";
+  if (mimeType === "text/plain" || ext === "txt") return "📝";
+  return "📁";
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function handleFileUpload() {
+  const input = document.getElementById("file-upload-input");
+  const file = input.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById("upload-status");
+  statusEl.textContent = `uploading ${file.name}…`;
+  statusEl.className = "upload-status uploading";
+  statusEl.classList.remove("hidden");
+
+  const uploadBtn = document.getElementById("upload-btn");
+  uploadBtn.disabled = true;
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const resp = await fetch(`${BASE_URL}/ingest/upload`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}` },
+      // Do NOT set Content-Type here — browser sets it automatically
+      // with the correct multipart boundary when using FormData.
+      body: formData,
     });
 
+    const data = await resp.json();
+
+    if (resp.ok) {
+      statusEl.textContent = `✓ ${data.filename} ingested (${data.chunks_ingested} chunks)`;
+      statusEl.className = "upload-status success";
+      await loadFiles();
+    } else {
+      statusEl.textContent = `✗ ${data.detail || "Upload failed."}`;
+      statusEl.className = "upload-status error";
+    }
   } catch (e) {
-    list.innerHTML = `<div class="memory-empty">failed to load memories.</div>`;
+    statusEl.textContent = "✗ Could not reach the server.";
+    statusEl.className = "upload-status error";
+  } finally {
+    uploadBtn.disabled = false;
+    input.value = "";          // reset so the same file can be re-selected
+  }
+}
+
+async function deleteFile(fileId) {
+  const statusEl = document.getElementById("upload-status");
+  statusEl.textContent = `deleting file…`;
+  statusEl.className = "upload-status uploading";
+  statusEl.classList.remove("hidden");
+  
+  try {
+    const resp = await apiFetch(`/ingest/files/${fileId}`, { method: "DELETE" });
+    if (resp.ok) {
+      statusEl.textContent = `✓ file deleted`;
+      statusEl.className = "upload-status success";
+      await loadFiles();
+    } else {
+      const data = await resp.json().catch(() => ({}));
+      statusEl.textContent = `✗ ${data.detail || "failed to delete file"}`;
+      statusEl.className = "upload-status error";
+    }
+  } catch (e) {
+    statusEl.textContent = `✗ error deleting file`;
+    statusEl.className = "upload-status error";
   }
 }
 
