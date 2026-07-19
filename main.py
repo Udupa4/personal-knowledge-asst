@@ -18,7 +18,7 @@ from src.config.event_handler import custom_shutdown_event_handler
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Personal Copilot (Phase 2)")
+app = FastAPI(title="Personal Knowledge Assistant")
 
 app.include_router(auth_router)
 app.include_router(ingest_router)
