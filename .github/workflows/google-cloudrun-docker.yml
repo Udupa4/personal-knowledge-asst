@@ -1,0 +1,108 @@
+# This workflow build and push a Docker container to Google Artifact Registry
+# and deploy it on Cloud Run when a commit is pushed to the "main"
+# branch.
+#
+# To configure this workflow:
+#
+# 1. Enable the following Google Cloud APIs:
+#
+#    - Artifact Registry (artifactregistry.googleapis.com)
+#    - Cloud Run (run.googleapis.com)
+#    - IAM Credentials API (iamcredentials.googleapis.com)
+#
+#    You can learn more about enabling APIs at
+#    https://support.google.com/googleapi/answer/6158841.
+#
+# 2. Create and configure a Workload Identity Provider for GitHub:
+#    https://github.com/google-github-actions/auth#preferred-direct-workload-identity-federation.
+#
+#    Depending on how you authenticate, you will need to grant an IAM principal
+#    permissions on Google Cloud:
+#
+#    - Artifact Registry Administrator (roles/artifactregistry.admin)
+#    - Cloud Run Developer (roles/run.developer)
+#
+#    You can learn more about setting IAM permissions at
+#    https://cloud.google.com/iam/docs/manage-access-other-resources
+#
+# 3. Change the values in the "env" block to match your values.
+
+name: Build and Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: personal-knowledge-asst   # GCP project ID
+  REGION: us-central1
+  SERVICE: personal-knowledge-asst
+  IMAGE: us-central1-docker.pkg.dev/personal-knowledge-asst/app-repo/personal-knowledge-asst
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write   # required for WIF token exchange
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Exchange GitHub's OIDC token for a short-lived GCP access token.
+      # service_account tells GCP which SA to impersonate after the token exchange.
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      # Configures Docker to authenticate to Artifact Registry using gcloud credentials
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      # Tag with commit SHA (immutable, traceable) and latest.
+      # SHA tagging means you can rollback by redeploying any previous SHA.
+      - name: Build and Push Container
+        run: |
+          docker build \
+            -t ${{ env.IMAGE }}:${{ github.sha }} \
+            -t ${{ env.IMAGE }}:latest \
+            .
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE }} \
+            --image ${{ env.IMAGE }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --service-account ${{ secrets.RUNTIME_SERVICE_ACCOUNT }} \
+            --min-instances 0 \
+            --max-instances 1 \
+            --memory 512Mi \
+            --set-env-vars="LLM_PROVIDER=google,\
+          GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }},\
+          REDIS_URL=${{ secrets.UPSTASH_REDIS_URL }},\
+          QDRANT_URL=${{ secrets.QDRANT_URL }},\
+          QDRANT_API_KEY=${{ secrets.QDRANT_API_KEY }},\
+          TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }},\
+          JWT_SECRET=${{ secrets.JWT_SECRET }},\
+          LANGCHAIN_API_KEY=${{ secrets.LANGCHAIN_API_KEY }},\
+          LANGCHAIN_TRACING_V2=${{ secrets.LANGCHAIN_TRACING_V2 }},\
+          LANGCHAIN_PROJECT=${{ secrets.LANGCHAIN_PROJECT }}"
+
+      - name: Show deployed URL
+        run: |
+          gcloud run services describe ${{ env.SERVICE }} \
+            --region ${{ env.REGION }} \
+            --format="value(status.url)"
