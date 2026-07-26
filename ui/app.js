@@ -1,5 +1,5 @@
 /* ── config ──────────────────────────────────────────────────────────────── */
-const BASE_URL = "http://localhost:8080";
+const BASE_URL = "https://personal-knowledge-asst-662749264716.us-central1.run.app";
 
 /* ── state ───────────────────────────────────────────────────────────────── */
 let token = localStorage.getItem("token") || null;

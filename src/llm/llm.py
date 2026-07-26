@@ -6,6 +6,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "google").lower()
+logger.info(f"Initializing LLM provider: {LLM_PROVIDER}")
 
 # Google
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "").strip()
@@ -20,7 +21,6 @@ DEFAULT_TEMPERATURE = 0.7
 
 
 def get_llm(temperature: float = DEFAULT_TEMPERATURE, max_tokens: int = DEFAULT_MAX_TOKENS):
-    logger.info(f"Initializing LLM provider: {LLM_PROVIDER}")
     if LLM_PROVIDER == "ollama":
         return _get_ollama_llm(temperature, max_tokens)
     return _get_google_llm(temperature, max_tokens)
