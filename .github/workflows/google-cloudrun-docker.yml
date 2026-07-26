@@ -91,7 +91,7 @@ jobs:
             --max-instances 1 \
             --memory 1Gi \
             --set-env-vars="LLM_PROVIDER=google,\
-          EMBEDDING_PROVIDER=${{ secrets.EMBEDDING_PROVIDER }},\
+          EMBEDDING_PROVIDER=gemini,\
           GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }},\
           REDIS_URL=${{ secrets.UPSTASH_REDIS_URL }},\
           QDRANT_URL=${{ secrets.QDRANT_URL }},\
