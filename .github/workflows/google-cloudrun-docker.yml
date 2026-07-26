@@ -89,7 +89,7 @@ jobs:
             --service-account ${{ secrets.RUNTIME_SERVICE_ACCOUNT }} \
             --min-instances 0 \
             --max-instances 1 \
-            --memory 1Gi \
+            --memory 2Gi \
             --set-env-vars="LLM_PROVIDER=google,\
           EMBEDDING_PROVIDER=gemini,\
           GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }},\
